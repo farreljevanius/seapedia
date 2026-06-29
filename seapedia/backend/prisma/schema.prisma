@@ -1,0 +1,94 @@
+// backend/prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  roles        Role[]   // Array of roles: ADMIN, SELLER, BUYER, DRIVER
+  
+  // Relations
+  store        Store?   // A user can have one store if they are a SELLER
+  orders       Order[]  // Orders placed as a BUYER
+  jobs         Job[]    // Deliveries taken as a DRIVER
+  wallet       Float    @default(0.0)
+}
+
+enum Role {
+  ADMIN
+  SELLER
+  BUYER
+  DRIVER
+}
+
+model Store {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  sellerId String    @unique
+  seller   User      @relation(fields: [sellerId], references: [id])
+  products Product[]
+  orders   Order[]   // Orders placed to this store
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  stock       Int
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id])
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  buyerId       String
+  buyer         User        @relation(fields: [buyerId], references: [id])
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id])
+  status        OrderStatus @default(SEDANG_DIKEMAS)
+  subtotal      Float
+  discount      Float       @default(0.0)
+  deliveryFee   Float
+  tax           Float       // PPN 12%
+  finalTotal    Float
+  deliveryMethod String     // INSTANT, NEXT_DAY, REGULAR
+  createdAt     DateTime    @default(now())
+  
+  statusHistory OrderHistory[]
+  job           Job?
+}
+
+enum OrderStatus {
+  SEDANG_DIKEMAS
+  MENUNGGU_PENGIRIM
+  SEDANG_DIKIRIM
+  PESANAN_SELESAI
+  DIKEMBALIKAN
+}
+
+model OrderHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus
+  timestamp DateTime    @default(now())
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  driverId  String
+  driver    User     @relation(fields: [driverId], references: [id])
+  earnings  Float
+  completed Boolean  @default(false)
+}
